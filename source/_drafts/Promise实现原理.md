@@ -17,14 +17,14 @@ Promise 在一定程度上继承自观察者和发布/订阅模式。
 下面是一个极简的例子，我们可以从观察者模式和发布/订阅模式来理解 Promise.
 
 ```js
-class MyPromise {
-  callbacks = []
+class Promise {
+  _callbacks = []
   constructor(executor) {
-    const callbacks = value => this.callbacks.forEach(callback => callback(value))
+    const callbacks = value => this._callbacks.forEach(callback => callback(value))
     executor(callbacks) // 相当于 emit 或 notify
   }
   then(onFulfilled) {
-    this.callbacks.push(onFulfilled) // 相当于 subscribe 或 on
+    this._callbacks.push(onFulfilled) // 相当于 subscribe 或 on
   }
 }
 
@@ -186,9 +186,215 @@ Thenable 的特性使得 `promise` 的实现更具通用性：只要其暴露出
 
 [^注5]：我们首先储存了指向 `x.then` 的引用，然后测试并调用该引用，以避免在过程中对 `x.then` 属性的多次访问。这是为了避免访问器属性在不同访问过程中发生改变，保证访问器属性的一致性。
 
-[^注6]: 实现不应对thenable 链的深度设限，并假设超出深度限制就是无限递归。只有真正的循环递归才应抛出 `TypeError` 异常。如果链上有多个不同的 thenable，则递归下去才是正确的行为。
+[^注6]: 实现不应对 thenable 链的深度设限，并假设超出深度限制就是无限递归。只有真正的循环递归才应抛出 `TypeError` 异常。如果链上有多个不同的 thenable，则递归下去才是正确的行为。
 
 ### 代码实现
+
+Promise 的原理是使用回调函数在异步操作后执行，只不过时将回调封装在内部，通过 `then` 方法实现链式使得多层回调看似变一层，而同一个 `promise` 的 `then` 方法可以调用多次。所以可以将回调函数（`onFulfilled` 和 `onRejected`）保存到数组中，在完成后执行。
+
+```js
+const STATE = {
+  PENDING: 'PENDING',
+  FULFILLED: 'FULFILLED',
+  REJECTED: 'REJECTED'
+}
+
+const Util = {
+  isFunction(val) {
+    return val && typeof val === 'function'
+  },
+  isObject(val) {
+    return val && typeof val === 'object'
+  }
+}
+
+class Promise {
+  _callbacks = []
+  _state = STATE.PENDING
+  _value = null
+  constructor(executor) {
+    // 绑定至当前的 promise
+    executor(this._resolve.bind(this), this._reject.bind(this))
+  }
+
+  _isPending() {
+    return this._state === STATE.PENDING
+  }
+
+  _isFulfilled() {
+    return this._state === STATE.FULFILLED
+  }
+
+  _isRejected() {
+    return this._state === STATE.REJECTED
+  }
+
+  _hasResolved() {
+    return this._isFulfilled() || this._isRejected()
+  }
+
+  _resolve(x) {
+    // 只执行一次，改变状态之后就不再改变
+    if (this._hasResolved()) return
+
+    // 判断传入的 x 是否是 promise 本身
+    // 避免无限循环
+    if (x === this) {
+      throw new Error('Resolving object can not be the same object')
+    } else if (x instanceof Promise) {
+      // 如果传入的值 x 是 promise, 则调用 x 的then 方法，进行递归调用,直到最后 x 不是 promise
+      // 绑定到当前 promise, 链接起两个 promise
+      x.then(this._resolve.bind(this), this._reject.bind(this))
+    // 如果 x 是对象或函数
+    } else if (Util.isObject(x) || Util.isFunction(x)) {
+      try {
+        // 如果 x 是 thenable
+        // 尝试读取 then 方法，并保存
+        const thenable = x.then
+        if (Util.isFunction(thenable)) {
+          thenable.call(
+            x,
+            value => {
+              this._resolve(value)
+            },
+            error => {
+              this._reject(error)
+            }
+          )
+        } else {
+          // thenable 不是函数
+          this._fulfill(x)
+        }
+      } catch (err) {
+        // 抛出错误
+        this._reject(err)
+      }
+    } else {
+      // 如果 x 不是对象或函数
+      this._fulfill(x)
+    }
+  }
+
+  _fulfill(result) {
+    // 只执行一次
+    if (this._hasResolved()) return
+
+    this._state = STATE.FULFILLED
+    this._value = result
+    // 完成后，执行回调函数数组中的回调方法
+    this._callbacks.forEach(handler => this._callHandler(handler))
+  }
+
+  _reject(error) {
+    // 只执行一次
+    if (this._hasResolved()) return
+
+    this._state = STATE.REJECTED
+    this._value = error
+    // 被拒绝后，执行回调函数数组中的回调方法
+    this._callbacks.forEach(handler => this._callHandler(handler))
+  }
+
+  _addHandler(onFulfilled, onRejected) {
+    // pending 状态下将其放入回调
+    this._callbacks.push({
+      onFulfilled,
+      onRejected
+    })
+  }
+
+  _callHandler(handler) {
+    // 判断是否已经转换为对应状态，并执行 handler 中的函数
+    if (this._isFulfilled() && Util.isFunction(handler.onFulfilled)) {
+      handler.onFulfilled(this._value)
+    } else if (this._isRejected() && Util.isFunction(handler.onRejected)) {
+      handler.onRejected(this._value)
+    }
+  }
+
+  then(onFulfilled, onRejected) {
+    switch (this._state) {
+      case STATE.PENDING: {
+        // 返回 promise 用于链接上下 promise
+        return new Promise((resolve, reject) => {
+          new Promise((resolve, reject) => {
+            this._addHandler(
+              (value) => {
+                setTimeout(() => {
+                  try {
+                    if (Util.isFunction(onFulfilled)) {
+                      // 将值传递给 onFulfilled 进行处理
+                      resolve(onFulfilled(value))
+                    } else {
+                      // 直接传递值
+                      resolve(value)
+                    }
+                  } catch (err) {
+                    reject(err)
+                  }
+                })
+              },
+              (error) => {
+                setTimeout(() => {
+                  try {
+                    if (Util.isFunction(onRejected)) {
+                      // 将值传递给 onRejected 进行处理
+                      resolve(onRejected(error))
+                    } else {
+                      // 拒绝 promise
+                      reject(error)
+                    }
+                  } catch (err) {
+                    reject(err)
+                  }
+                })
+              }
+            )
+          })
+        })
+      }
+      case STATE.FULFILLED: {
+        return new Promise((resolve, reject) => {
+          setTimeout(() => {
+            try {
+              if (Util.isFunction(onFulfilled)) {
+                // 执行后，将值传入 onFulfilled 进行处理
+                resolve(onFulfilled(this._value))
+              } else {
+                // 不是函数，则忽略
+                resolve(this._value)
+              }
+            } catch (err) {
+              reject(err)
+            }
+          })
+        })
+      }
+      case STATE.REJECTED: {
+        return new Promise((resolve, reject) => {
+          setTimeout(() => {
+            try {
+              // 如果是函数
+              if (Util.isFunction(onRejected)) {
+                resolve(onRejected(this._value))
+              } else {
+                // 不是函数
+                reject(this._value)
+              }
+            } catch (err) {
+              reject(err)
+            }
+          })
+        })
+      }
+    }
+  }
+}
+```
+
+这样我基本实现了 Promise/A+ 规范，相比 ES6 中的 Promise, 还缺少一些 API，这些 API 相对简单。对于 Promise, executor 会立即执行， executor 会接受两个参数——回调函数，回调函数绑定 `this` 至当前 promise，当 executor 执行完毕或拒绝后，会执行回调函数，影响到当前 promise，如改变 promise 的状态，以调用 `then` 注册的回调函数，所以回调函数是链接上下 Promise 的关键。`then` 方法会注册回调函数，并且返回 promise, 以进行链式调用，不过它的内部还对接受的参数进行了一些判断和处理。
+
+下面，我们来添加 ES6 中 Promise 有的 API.
 
 ## Promise 优缺点
 
