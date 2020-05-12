@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="utf-8">
+  
+  <title>L9m&#39;s note</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta property="og:type" content="website">
+<meta property="og:title" content="L9m&#39;s note">
+<meta property="og:url" content="https://lninem.com/index.html">
+<meta property="og:site_name" content="L9m&#39;s note">
+<meta property="og:locale" content="default">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="L9m&#39;s note">
+  
+    <link rel="alternate" href="/atom.xml" title="L9m&#39;s note" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.png">
+  
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link rel="stylesheet" href="/css/style.css">
+  
+
+</head>
+</html>
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">L9m&#39;s note</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+        
+        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="https://lninem.com"></form>
+      </div>
+    </div>
+  </div>
+</header>
+      <div class="outer">
+        <section id="main">
+  
+    <article id="post-Promise实现原理" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2020/05/12/Promise实现原理/" class="article-date">
+  <time datetime="2020-05-12T07:06:02.000Z" itemprop="datePublished">2020-05-12</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2020/05/12/Promise实现原理/">Promise实现原理</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h1 id="Promise-实现原理"><a href="#Promise-实现原理" class="headerlink" title="Promise 实现原理"></a>Promise 实现原理</h1><h2 id="Promise-简史"><a href="#Promise-简史" class="headerlink" title="Promise 简史"></a>Promise 简史</h2><p>Promise 作为一种异步编程的解决方案，在 JavaScript 被广泛使用。Promise 并不是一个新的概念，Promise 的概念在 1976 年就已经被提出。<br>在 2011年初，Promise 随着 jQuery 1.5 的发布，而变得越来越流行。2012 年，Promise 被提出作为规范。Promise 在 ECMAScript 2015 中成为正式规范，并已被几乎所有的浏览器和 Node 兼容。</p>
+<h2 id="从设计模式来看-Promise"><a href="#从设计模式来看-Promise" class="headerlink" title="从设计模式来看 Promise"></a>从设计模式来看 Promise</h2><p>Promise 在一定程度上继承自观察者和发布/订阅模式。</p>
+<p>下面是一个极简的例子，我们可以从观察者模式和发布/订阅模式来理解 Promise.</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Promise</span> </span>&#123;</span><br><span class="line">  _callbacks = []</span><br><span class="line">  <span class="keyword">constructor</span>(executor) &#123;</span><br><span class="line">    <span class="keyword">const</span> callbacks = <span class="function"><span class="params">value</span> =&gt;</span> <span class="keyword">this</span>._callbacks.forEach(<span class="function"><span class="params">callback</span> =&gt;</span> callback(value))</span><br><span class="line">    executor(callbacks) <span class="comment">// 相当于 emit 或 notify</span></span><br><span class="line">  &#125;</span><br><span class="line">  then(onFulfilled) &#123;</span><br><span class="line">    <span class="keyword">this</span>._callbacks.push(onFulfilled) <span class="comment">// 相当于 subscribe 或 on</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> promise1 = <span class="keyword">new</span> MyPromise(<span class="function">(<span class="params">callback</span>) =&gt;</span> &#123;</span><br><span class="line">  setTimeout(<span class="function"><span class="params">()</span> =&gt;</span> &#123;</span><br><span class="line">    callback(<span class="string">'promise1'</span>)</span><br><span class="line">  &#125;, <span class="number">1000</span>)</span><br><span class="line">&#125;)</span><br><span class="line"></span><br><span class="line">promise1.then(<span class="function">(<span class="params">value</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="built_in">console</span>.log(<span class="string">'1 秒后'</span>, value)</span><br><span class="line">&#125;)</span><br><span class="line"></span><br><span class="line">promise1.then(<span class="function">(<span class="params">value</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="built_in">console</span>.log(<span class="string">'1 秒后'</span>, value)</span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure>
+<p>但是 Promise 是一种高度封装的接口，它的 API 不止如此简单，Promise 有其自身的 Promise。</p>
+<h2 id="Promise-规范"><a href="#Promise-规范" class="headerlink" title="Promise 规范"></a>Promise 规范</h2><p>Promise 的实现有不同的规范，如 <a href="http://wiki.commonjs.org/wiki/Promises/A" target="_blank" rel="noopener">Promise/A</a>，<a href="https://promisesaplus.com/differences-from-promises-a" target="_blank" rel="noopener">Promise/A+</a>，<a href="http://wiki.commonjs.org/wiki/Promises/B" target="_blank" rel="noopener">Promise/B</a>，<a href="http://wiki.commonjs.org/wiki/Promises/KISS" target="_blank" rel="noopener">Promise/KISS</a>，Promise/C，<a href="http://wiki.commonjs.org/wiki/Promises/D" target="_blank" rel="noopener">Promise/D</a> 规范。<br>Promise/A 规范定义了什么是 Promise，其他规范在其基础上扩展了相关 API.ES6 的 Promise 是基于 Promise/A+ 规范的实现。而 Promise/A+ 是基于 Promise/A 规范的升级。相关规范也提供了<a href="https://github.com/promises-aplus/promises-tests" target="_blank" rel="noopener">测试</a>，以检测实现是否兼容规范。由于ECMAScript 使用 Promise/A+ 规范，这里我们使用 JavaScript 来实现 Promise/A+ 规范。<a href="https://promisesaplus.com/implementations" target="_blank" rel="noopener">这里</a>有很多 Promise/A+ 的实现。</p>
+<h2 id="实现-Promise-A-规范"><a href="#实现-Promise-A-规范" class="headerlink" title="实现 Promise/A+ 规范"></a>实现 Promise/A+ 规范</h2><p>下面是关于 Promise/A+ 规范的介绍。先了解规范以便于实现该规范。<br>Promise 表示异步操作的最终结果，与之交互的主要方式是通过 <code>then</code> 方法，该方法注册两个回调函数，用于接受 Promise 终值或 promise 抛出的异常。</p>
+<h3 id="相关术语"><a href="#相关术语" class="headerlink" title="相关术语"></a>相关术语</h3><ol>
+<li>Promise 表示拥有 <code>then</code> 方法的对象或者函数,其行为符合本规范；</li>
+<li>Thenable  表示拥有 <code>then</code> 方法的对象或函数；</li>
+<li>值（value）指合法的 JavaScript 值（包括 <code>undefined</code>, thenable 或 promise）；</li>
+<li>异常（exception） 指使用 <code>throw</code> 语句抛出的值；</li>
+<li>拒因（reason）指 promise 被拒绝的原因；</li>
+</ol>
+<h3 id="规范要求"><a href="#规范要求" class="headerlink" title="规范要求"></a>规范要求</h3><h4 id="Promise-的状态"><a href="#Promise-的状态" class="headerlink" title="Promise 的状态"></a>Promise 的状态</h4><p>Promise 有三种状态：等待态（Pending）, 执行态（Fulfilled） 或 拒绝态（Rejected）。</p>
+<ul>
+<li>等待态（Pending）<ul>
+<li>可以转换为 fulfilled 或 rejected</li>
+</ul>
+</li>
+<li>执行态（Fulfilled）<ul>
+<li>不能转换为其他状态</li>
+<li>拥一个<strong>不可变</strong>的终值</li>
+</ul>
+</li>
+<li>拒绝态（Rejected）。<ul>
+<li>不能转换为其他状态</li>
+<li>拥有一个不可变的拒因<br>这里的不可变指标识的不可变（immutable identity）（可用 <code>===</code> 判断相等），但不是深度不可变。<br>（引用地址相等，但可更改属性值）。这里我们举个例子</li>
+</ul>
+</li>
+</ul>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">let</span> value = [<span class="number">1</span>]</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> p = <span class="built_in">Promise</span>.resolve(value)</span><br><span class="line"></span><br><span class="line">p.then(<span class="function"><span class="params">val</span> =&gt;</span> <span class="built_in">console</span>.log(val)) <span class="comment">// [1]</span></span><br><span class="line">p.then(<span class="function"><span class="params">val</span> =&gt;</span> <span class="built_in">console</span>.log(val === value)) <span class="comment">// true</span></span><br><span class="line"></span><br><span class="line">p.then(<span class="function"><span class="params">val</span> =&gt;</span> &#123; val = [<span class="number">2</span>]; <span class="built_in">console</span>.log(val)&#125;) <span class="comment">// [2]</span></span><br><span class="line">p.then(<span class="function"><span class="params">val</span> =&gt;</span> &#123; <span class="built_in">console</span>.log(val) &#125;) <span class="comment">// [1]</span></span><br><span class="line"></span><br><span class="line">p.then(<span class="function"><span class="params">val</span> =&gt;</span> &#123; val[<span class="number">0</span>] = <span class="number">2</span>; <span class="built_in">console</span>.log(val === value)&#125;) <span class="comment">// [2] true</span></span><br><span class="line">p.then(<span class="function"><span class="params">val</span> =&gt;</span> <span class="built_in">console</span>.log(val)) <span class="comment">// [2]</span></span><br><span class="line">p.then(<span class="function"><span class="params">val</span> =&gt;</span> <span class="built_in">console</span>.log(val === value)) <span class="comment">//  true</span></span><br></pre></td></tr></table></figure>
+<h4 id="Then-方法"><a href="#Then-方法" class="headerlink" title="Then 方法"></a>Then 方法</h4><p>Promise 一定有一个 <code>then</code> 方法，<code>then</code> 方法接受两个参数：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">promise.then(onFulfilled, onRejected)</span><br></pre></td></tr></table></figure>
+<ul>
+<li><code>onFulfilled</code> 和 <code>onRejected</code> 都为可选参数；<ul>
+<li>若 <code>onFulfilled</code> 不是函数，则被忽略；</li>
+<li>若 <code>onRejected</code> 不是函数，则被忽略；</li>
+</ul>
+</li>
+<li><code>onFulfilled</code><ul>
+<li>在 <code>promise</code> 执行（fulfilled）后调用，其第一个参数为 <code>promise</code> 的终值；</li>
+<li>在 <code>promise</code> 执行结束（fulfilled）前不可调用；</li>
+<li>其只调用一次；</li>
+</ul>
+</li>
+<li><code>onRejected</code>：<ul>
+<li>在 <code>promise</code> 决绝（rejected）后调用，其第一个参数为 <code>promise</code> 的据因；</li>
+<li>它必须在 promise rejected 状态之后调用；</li>
+<li>其只调用一次；</li>
+</ul>
+</li>
+<li><code>onFulfilled</code> 或 <code>onRejected</code> 只有在<a href="http://es5.github.io/#x10.3" target="_blank" rel="noopener">执行环境</a>堆栈仅包含平台代码[^注1]后才可调用</li>
+<li><code>onFulfilled</code> 或 <code>onRejected</code> 是作为函数调用（即没有 this 值）[^注2]；</li>
+<li><p><code>then</code> 可以在同一个 promise 上调用多次</p>
+<ul>
+<li>当 <code>promise</code> 被执行后，所有的 <code>onFulfilled</code> 回调会按照注册的顺序依次执行；</li>
+<li>当 <code>promise</code> 被拒绝后，所有的 <code>onRejected</code> 回调会按照指定的顺序执行；</li>
+</ul>
+</li>
+<li><p><code>then</code> 方法一定返回 <code>promise</code> 对象。[^注3]</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">promise2 = promise1.then(onFulfilled, onRejected)</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>如果 <code>onFulfilled</code> 或 <code>onRejected</code> 返回一个值 <code>x</code>, 则运行 Promise 解决过程 <code>[[Resolve]](promise2, x)</code>;</p>
+</li>
+<li>如果 <code>onFulfilled</code> 或 <code>onRejected</code> 抛出异常 <code>e</code>，<code>promise2</code> 必须拒绝执行, 并以 <code>e</code> 作为拒因;</li>
+<li>如果 <code>onFulfiled</code> 不是函数且 <code>promise1</code> 被执行，则 <code>promise2</code> 执行并返回和 <code>promise1</code> 相同的值。</li>
+<li>如果 <code>onRejected</code> 不是函数且 <code>promise1</code> 被拒绝，则 <code>promise2</code> 拒绝并返回和 <code>promise1</code> 相同的拒因。</li>
+</ul>
+<p>（<strong>不论 <code>promise1</code> reject 还是 resolve , <code>promise2</code> 都会被 resolve，只有在 <code>promise1</code> 抛出异常后，<code>promise2</code> 才会被拒绝（reject）,其余都会被执行完成</strong>）</p>
+<h3 id="Promise-解决过程"><a href="#Promise-解决过程" class="headerlink" title="Promise 解决过程"></a>Promise 解决过程</h3><p><strong>Promise 的解决过程</strong>是一个抽象的操作，其需输入一个 promise 和一个值 <code>x</code>，将其表示为 <code>[[resolve]](promise, x)</code>。</p>
+<p>如果 <code>x</code> 有 <code>then</code> 方法 ，且行为像 <code>promise</code>, 解决程序会试图使 <code>promise</code> 接受 <code>x</code> 的状态，否则其用 <code>x</code> 的值执行 <code>promise</code>。</p>
+<p>Thenable 的特性使得 <code>promise</code> 的实现更具通用性：只要其暴露出一个遵循 Promise/A+ 规范的 <code>then</code> 方法即可，同时也使 Promise/A+ 规范能与那些不太规范实现良好兼容。</p>
+<p>运行 <code>[[resolve]](promise, x)</code>，会执行以下步骤：</p>
+<ol>
+<li><p>如果 <code>promise</code> 和 <code>x</code> 指向同一个对象，抛出 <code>TypeError</code> 为拒因并拒绝 <code>promise</code>。</p>
+</li>
+<li><p><code>x</code> 为 Promise：如果 <code>x</code> 为 <code>promise</code>，则使 <code>promise</code> 接受 <code>x</code> 的状态。[^注4]</p>
+<ul>
+<li><code>x</code> 处于等待态（<code>pending</code>）， <code>promise</code> 需保持等待态（<code>pending</code>）直到 <code>x</code> 被解决或被拒绝；</li>
+<li><code>x</code> 处于执行态（<code>fulfilled</code>），用同样的值执行 <code>promise</code>；</li>
+<li><code>x</code> 处于拒绝态（<code>rejected</code>），用同样的据因拒绝 <code>promise</code>；</li>
+</ul>
+</li>
+<li><code>x</code> 为对象或函数：<ul>
+<li>把 <code>x.then</code> 赋值给 <code>then</code>；[^注5]</li>
+<li>如果取 <code>x.then</code> 值抛出错误 <code>e</code>，则将 <code>e</code> 作为据因拒绝 <code>promise</code>；</li>
+<li>如果 <code>then</code> 是函数，将 <code>x</code> 作为其 <code>this</code> 值（绑定至 <code>x</code>）来调用，第一个参数为 <code>resolvePromise</code> ，第二个参数是 <code>rejectPromise</code><ul>
+<li>如果 <code>resolvePromise</code>以参数 <code>y</code> 调用，运行 <code>[[resolve]](promise, y)</code></li>
+<li>如果 <code>rejectPromise</code>以据因 <code>r</code> 调用，则以 <code>r</code> 为原因拒绝 <code>promise</code></li>
+<li>如果 <code>resolvePromise</code> 和 <code>rejectPromise</code> 均被调用，或者被同样的参数调用多次，则第一个调用优先，其他的调用都将被忽略。</li>
+<li>如果调用 <code>then</code> 抛出异常 <code>e</code><ul>
+<li>如果 <code>resolvePromise</code> 和 <code>rejectPromise</code> 已调用过，则忽略</li>
+<li>否则以 <code>e</code> 为原因拒绝 <code>Promise</code></li>
+</ul>
+</li>
+<li>如果 <code>then</code> 不是函数，则 <code>x</code> 为值执行 <code>promise</code></li>
+<li>如果 <code>x</code> 不是一个对象或函数，则以 <code>x</code> 为值执行 <code>promise</code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ol>
+<p>（这里 <code>then</code> 是函数，为 <code>promise</code> 核心。）</p>
+<p>如果一个 <code>promise</code> 被一个循环的 thenable 链中的对象解决, 而 <code>[[resolve]](promise, thenable)</code> 的递归性质使得其被再次调用，将导致无线递归。鼓励（但不是必需的）检测这种递归，并以 <code>TypeError</code> 为据因拒绝 <code>promise</code>。[^注6]</p>
+<h3 id="注解"><a href="#注解" class="headerlink" title="注解"></a>注解</h3><p>[^注1]: 这里的平台代码是指引擎、环境以及 promise 的实现代码。实际上，此要求可确保在事件循环回合之后调用 <code>onFulfilled</code> 或 <code>onRejected</code> 并随后以新的栈异步执行。可使用<strong>宏任务(macro-task)</strong>机制（如 <code>setTimeout</code> 或 <code>setImmetiate</code> 或<strong>微任务(micro-task)</strong>机制（如 <code>MutationObserver</code> 或 <code>process.nextTick</code>）来实现。由于 promise 实现代码就是平台代码，因此它本身可能包含一个任务调度队列或 trampoline 在其中调用处理程序。</p>
+<blockquote>
+<p>（这里提到了事件循环（EventLoop）、宏任务（macro-task）和微任务（micro-task）等概念，事件循环是一个执行模型。在执行 JavaScript 代码时，将整个脚本作为一个宏任务（macro-task）执行，执行过程中，同步代码会直接执行，而其他代码引擎会将任务按照类别分到这两个队列中，分别是宏任务（macro-task）和微任务（micro-task）队列，首先在 macrotask 的队列（这个队列也被叫做 task queue）中取出第一个任务，执行完毕后取出 microtask 队列中的所有任务顺序执行；之后再取 macrotask 任务，周而复始，直到两个队列执行完毕。）</p>
+</blockquote>
+<ul>
+<li><blockquote>
+<p>宏任务（macro-task）：<code>script</code> 、<code>setTimeout</code>、<code>setInterval</code> 、<code>setImmediate</code> 、I/O 、UI rendering</p>
+</blockquote>
+</li>
+<li><blockquote>
+<p>微任务（micro-task）：<code>process.nextTick</code>, <code>Promises</code>（浏览器原生，和基于此的技术，如 <code>fetch</code> 等）, <code>Object.observe</code>, <code>MutationObserver</code></p>
+</blockquote>
+</li>
+</ul>
+<p>[^注2]: 在严格模式下，<code>this</code> 会是 <code>undefined</code>。在宽松模式下其为 <code>global</code> 对象。</p>
+<p>[^注3]: 如果符合所有其他规范要求，可以允许 <code>promise2 === promise1</code>。每种实现都应说明 <code>promise2 === promise1</code> 是否可以成立，以及在什么条件下成立。</p>
+<p>[^注4]: 通常，只有它来自当前的实现，才能判断 <code>x</code> 是否是一个真正的 promise。此条款允许采取已知符合 promise 标准实现的状态。</p>
+<p>[^注5]：我们首先储存了指向 <code>x.then</code> 的引用，然后测试并调用该引用，以避免在过程中对 <code>x.then</code> 属性的多次访问。这是为了避免访问器属性在不同访问过程中发生改变，保证访问器属性的一致性。</p>
+<p>[^注6]: 实现不应对 thenable 链的深度设限，并假设超出深度限制就是无限递归。只有真正的循环递归才应抛出 <code>TypeError</code> 异常。如果链上有多个不同的 thenable，则递归下去才是正确的行为。</p>
+<h3 id="代码实现"><a href="#代码实现" class="headerlink" title="代码实现"></a>代码实现</h3><p>Promise 的原理是使用回调函数在异步操作后执行，只不过时将回调封装在内部，通过 <code>then</code> 方法实现链式使得多层回调看似变一层，而同一个 <code>promise</code> 的 <code>then</code> 方法可以调用多次。所以可以将回调函数（<code>onFulfilled</code> 和 <code>onRejected</code>）保存到数组中，在完成后执行。</p>
+<p>代码实现：<a href="https://github.com/L9m/promise.git" target="_blank" rel="noopener">code</a></p>
+<p>这样我基本实现了 Promise/A+ 规范，相比 ES6 中的 Promise, 还缺少一些 API，这些 API 相对简单。对于 Promise, executor 会立即执行， executor 会接受两个参数——回调函数，回调函数绑定 <code>this</code> 至当前 promise，当 executor 执行完毕或拒绝后，会执行回调函数，改变当前 promise，如改变 promise 的状态，然后调用 <code>then</code> 注册的回调函数，所以回调函数是链接上下 Promise 的关键。<code>then</code> 方法会注册回调函数，并且返回 promise, 以进行链式调用，不过它的内部还对接受的参数进行了一些判断和处理。</p>
+<h2 id="Promise-优缺点"><a href="#Promise-优缺点" class="headerlink" title="Promise 优缺点"></a>Promise 优缺点</h2><p>Promise 相对于观察者模式和发布/订阅模式的优点是：</p>
+<ol>
+<li>Promise 一定程度上解决了深度嵌套的问题；</li>
+<li>Promise API 暴露相对简洁，也更为优雅；</li>
+<li>支持序列执行，利于多异步协作；</li>
+<li>更好的错误处理；</li>
+</ol>
+<p>主要缺点是：高级接口对 API 的封装使其失去了一定的灵活性。</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><ul>
+<li><a href="https://promisesaplus.com/" target="_blank" rel="noopener">Promises/A+</a></li>
+<li><a href="https://github.com/leer0911/myPromise" target="_blank" rel="noopener">TS 版 Promise ，promise-polyfill 实现过程详解</a></li>
+<li><a href="https://github.com/yanguango/promised" target="_blank" rel="noopener">promised</a></li>
+<li><a href="https://zhuanlan.zhihu.com/p/58428287" target="_blank" rel="noopener">图解 Promise 实现原理</a></li>
+</ul>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://lninem.com/2020/05/12/Promise实现原理/" data-id="cka3knzqc0000j4tpg2ii5pt3" class="article-share-link">Share</a>
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-test" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2019/03/20/test/" class="article-date">
+  <time datetime="2019-03-20T03:11:38.000Z" itemprop="datePublished">2019-03-20</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2019/03/20/test/">test</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="test"><a href="#test" class="headerlink" title="test"></a>test</h2>
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://lninem.com/2019/03/20/test/" data-id="cka3knzqh0001j4tp21uu0x5y" class="article-share-link">Share</a>
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+
+  
+    
+
+  
+    
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">May 2020</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">March 2019</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2020/05/12/Promise实现原理/">Promise实现原理</a>
+          </li>
+        
+          <li>
+            <a href="/2019/03/20/test/">test</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      &copy; 2020 L9m<br>
+      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+
+  </div>
+</body>
+</html>

@@ -1,7 +1,9 @@
 ---
 title: Promise实现原理
+date: 2020-05-12 15:06:02
 tags:
 ---
+
 
 # Promise 实现原理
 
