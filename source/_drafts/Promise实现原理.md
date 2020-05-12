@@ -173,7 +173,7 @@ Thenable 的特性使得 `promise` 的实现更具通用性：只要其暴露出
 
 [^注1]: 这里的平台代码是指引擎、环境以及 promise 的实现代码。实际上，此要求可确保在事件循环回合之后调用 `onFulfilled` 或 `onRejected` 并随后以新的栈异步执行。可使用**宏任务(macro-task)**机制（如 `setTimeout` 或 `setImmetiate` 或**微任务(micro-task)**机制（如 `MutationObserver` 或 `process.nextTick`）来实现。由于 promise 实现代码就是平台代码，因此它本身可能包含一个任务调度队列或 trampoline 在其中调用处理程序。
 
-> （这里提到了事件循环（EventLoop）、宏任务（macro-task）和微任务（micro-task）等概念，事件循环是一个执行模型。在执行 JavaScript 代码时，将整个脚本作为一个宏任务（macro-task）执行，执行过程中，同步代码会直接执行，而其他代码引擎会将任务按照类别分到这两个队列中，分别时宏任务（macro-task）和微任务（micro-task）队列，首先在 macrotask 的队列（这个队列也被叫做 task queue）中取出第一个任务，执行完毕后取出 microtask 队列中的所有任务顺序执行；之后再取 macrotask 任务，周而复始，直到两个队列执行完毕。）
+> （这里提到了事件循环（EventLoop）、宏任务（macro-task）和微任务（micro-task）等概念，事件循环是一个执行模型。在执行 JavaScript 代码时，将整个脚本作为一个宏任务（macro-task）执行，执行过程中，同步代码会直接执行，而其他代码引擎会将任务按照类别分到这两个队列中，分别是宏任务（macro-task）和微任务（micro-task）队列，首先在 macrotask 的队列（这个队列也被叫做 task queue）中取出第一个任务，执行完毕后取出 microtask 队列中的所有任务顺序执行；之后再取 macrotask 任务，周而复始，直到两个队列执行完毕。）
 
 - > 宏任务（macro-task）：`script` 、`setTimeout`、`setInterval` 、`setImmediate` 、I/O 、UI rendering
 - > 微任务（micro-task）：`process.nextTick`, `Promises`（浏览器原生，和基于此的技术，如 `fetch` 等）, `Object.observe`, `MutationObserver`
@@ -192,209 +192,9 @@ Thenable 的特性使得 `promise` 的实现更具通用性：只要其暴露出
 
 Promise 的原理是使用回调函数在异步操作后执行，只不过时将回调封装在内部，通过 `then` 方法实现链式使得多层回调看似变一层，而同一个 `promise` 的 `then` 方法可以调用多次。所以可以将回调函数（`onFulfilled` 和 `onRejected`）保存到数组中，在完成后执行。
 
-```js
-const STATE = {
-  PENDING: 'PENDING',
-  FULFILLED: 'FULFILLED',
-  REJECTED: 'REJECTED'
-}
+代码实现：[code](https://github.com/L9m/promise.git)
 
-const Util = {
-  isFunction(val) {
-    return val && typeof val === 'function'
-  },
-  isObject(val) {
-    return val && typeof val === 'object'
-  }
-}
-
-class Promise {
-  _callbacks = []
-  _state = STATE.PENDING
-  _value = null
-  constructor(executor) {
-    // 绑定至当前的 promise
-    executor(this._resolve.bind(this), this._reject.bind(this))
-  }
-
-  _isPending() {
-    return this._state === STATE.PENDING
-  }
-
-  _isFulfilled() {
-    return this._state === STATE.FULFILLED
-  }
-
-  _isRejected() {
-    return this._state === STATE.REJECTED
-  }
-
-  _hasResolved() {
-    return this._isFulfilled() || this._isRejected()
-  }
-
-  _resolve(x) {
-    // 只执行一次，改变状态之后就不再改变
-    if (this._hasResolved()) return
-
-    // 判断传入的 x 是否是 promise 本身
-    // 避免无限循环
-    if (x === this) {
-      throw new Error('Resolving object can not be the same object')
-    } else if (x instanceof Promise) {
-      // 如果传入的值 x 是 promise, 则调用 x 的then 方法，进行递归调用,直到最后 x 不是 promise
-      // 绑定到当前 promise, 链接起两个 promise
-      x.then(this._resolve.bind(this), this._reject.bind(this))
-    // 如果 x 是对象或函数
-    } else if (Util.isObject(x) || Util.isFunction(x)) {
-      try {
-        // 如果 x 是 thenable
-        // 尝试读取 then 方法，并保存
-        const thenable = x.then
-        if (Util.isFunction(thenable)) {
-          thenable.call(
-            x,
-            value => {
-              this._resolve(value)
-            },
-            error => {
-              this._reject(error)
-            }
-          )
-        } else {
-          // thenable 不是函数
-          this._fulfill(x)
-        }
-      } catch (err) {
-        // 抛出错误
-        this._reject(err)
-      }
-    } else {
-      // 如果 x 不是对象或函数
-      this._fulfill(x)
-    }
-  }
-
-  _fulfill(result) {
-    // 只执行一次
-    if (this._hasResolved()) return
-
-    this._state = STATE.FULFILLED
-    this._value = result
-    // 完成后，执行回调函数数组中的回调方法
-    this._callbacks.forEach(handler => this._callHandler(handler))
-  }
-
-  _reject(error) {
-    // 只执行一次
-    if (this._hasResolved()) return
-
-    this._state = STATE.REJECTED
-    this._value = error
-    // 被拒绝后，执行回调函数数组中的回调方法
-    this._callbacks.forEach(handler => this._callHandler(handler))
-  }
-
-  _addHandler(onFulfilled, onRejected) {
-    // pending 状态下将其放入回调
-    this._callbacks.push({
-      onFulfilled,
-      onRejected
-    })
-  }
-
-  _callHandler(handler) {
-    // 判断是否已经转换为对应状态，并执行 handler 中的函数
-    if (this._isFulfilled() && Util.isFunction(handler.onFulfilled)) {
-      handler.onFulfilled(this._value)
-    } else if (this._isRejected() && Util.isFunction(handler.onRejected)) {
-      handler.onRejected(this._value)
-    }
-  }
-
-  then(onFulfilled, onRejected) {
-    switch (this._state) {
-      case STATE.PENDING: {
-        // 返回 promise 用于链接上下 promise
-        return new Promise((resolve, reject) => {
-          new Promise((resolve, reject) => {
-            this._addHandler(
-              (value) => {
-                setTimeout(() => {
-                  try {
-                    if (Util.isFunction(onFulfilled)) {
-                      // 将值传递给 onFulfilled 进行处理
-                      resolve(onFulfilled(value))
-                    } else {
-                      // 直接传递值
-                      resolve(value)
-                    }
-                  } catch (err) {
-                    reject(err)
-                  }
-                })
-              },
-              (error) => {
-                setTimeout(() => {
-                  try {
-                    if (Util.isFunction(onRejected)) {
-                      // 将值传递给 onRejected 进行处理
-                      resolve(onRejected(error))
-                    } else {
-                      // 拒绝 promise
-                      reject(error)
-                    }
-                  } catch (err) {
-                    reject(err)
-                  }
-                })
-              }
-            )
-          })
-        })
-      }
-      case STATE.FULFILLED: {
-        return new Promise((resolve, reject) => {
-          setTimeout(() => {
-            try {
-              if (Util.isFunction(onFulfilled)) {
-                // 执行后，将值传入 onFulfilled 进行处理
-                resolve(onFulfilled(this._value))
-              } else {
-                // 不是函数，则忽略
-                resolve(this._value)
-              }
-            } catch (err) {
-              reject(err)
-            }
-          })
-        })
-      }
-      case STATE.REJECTED: {
-        return new Promise((resolve, reject) => {
-          setTimeout(() => {
-            try {
-              // 如果是函数
-              if (Util.isFunction(onRejected)) {
-                resolve(onRejected(this._value))
-              } else {
-                // 不是函数
-                reject(this._value)
-              }
-            } catch (err) {
-              reject(err)
-            }
-          })
-        })
-      }
-    }
-  }
-}
-```
-
-这样我基本实现了 Promise/A+ 规范，相比 ES6 中的 Promise, 还缺少一些 API，这些 API 相对简单。对于 Promise, executor 会立即执行， executor 会接受两个参数——回调函数，回调函数绑定 `this` 至当前 promise，当 executor 执行完毕或拒绝后，会执行回调函数，影响到当前 promise，如改变 promise 的状态，以调用 `then` 注册的回调函数，所以回调函数是链接上下 Promise 的关键。`then` 方法会注册回调函数，并且返回 promise, 以进行链式调用，不过它的内部还对接受的参数进行了一些判断和处理。
-
-下面，我们来添加 ES6 中 Promise 有的 API.
+这样我基本实现了 Promise/A+ 规范，相比 ES6 中的 Promise, 还缺少一些 API，这些 API 相对简单。对于 Promise, executor 会立即执行， executor 会接受两个参数——回调函数，回调函数绑定 `this` 至当前 promise，当 executor 执行完毕或拒绝后，会执行回调函数，改变当前 promise，如改变 promise 的状态，然后调用 `then` 注册的回调函数，所以回调函数是链接上下 Promise 的关键。`then` 方法会注册回调函数，并且返回 promise, 以进行链式调用，不过它的内部还对接受的参数进行了一些判断和处理。
 
 ## Promise 优缺点
 
@@ -406,3 +206,10 @@ Promise 相对于观察者模式和发布/订阅模式的优点是：
 4. 更好的错误处理；
 
 主要缺点是：高级接口对 API 的封装使其失去了一定的灵活性。
+
+## 参考
+
+- [Promises/A+](https://promisesaplus.com/)
+- [TS 版 Promise ，promise-polyfill 实现过程详解](https://github.com/leer0911/myPromise)
+- [promised](https://github.com/yanguango/promised)
+- [图解 Promise 实现原理](https://zhuanlan.zhihu.com/p/58428287)
